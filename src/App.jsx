@@ -104,6 +104,8 @@ const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Almarai:wght@400;700;800&family=Tajawal:wght@300;400;500;700&display=swap');
 
+    html, body { margin: 0; padding: 0; background: ${COLORS.paper}; }
+    #root { min-height: 100vh; }
     .ob-app { font-family: 'Tajawal', sans-serif; background: ${COLORS.paper}; color: ${COLORS.ink}; min-height: 100vh; direction: rtl; }
     .ob-app * { box-sizing: border-box; }
     .ob-heading { font-family: 'Almarai', sans-serif; }
@@ -337,7 +339,6 @@ function MobileMenu({ setView, goShop, close }) {
       {CATEGORIES.map((c) => <button key={c} onClick={() => go(() => goShop(c))}>{c}</button>)}
       <button onClick={() => go(() => setView("favorites"))}>المفضلة</button>
       <button onClick={() => go(() => setView("help"))}>مساعدة ومعلومات</button>
-      <button onClick={() => go(() => setView("admin"))}>لوحة التحكم</button>
     </div>
   );
 }
@@ -559,7 +560,7 @@ function ProductPage({ product, setView, addToCart, isFav, toggleFavorite }) {
   const outOfStock = product.stock <= 0;
   return (
     <section className="ob-section">
-      <button className="ob-back-btn" onClick={() => setView("shop")}>‹ رجوع إلى المتجر</button>
+      <button className="ob-back-btn" onClick={() => window.history.back()}>‹ رجوع</button>
       <div className="ob-product-detail">
         <div className="ob-detail-cover" style={product.image ? {} : { background: product.color }}>
           {product.image ? (
@@ -730,7 +731,6 @@ function Footer({ settings, setView }) {
       </div>
       <div className="ob-footer-links">
         <button className="ob-admin-link" onClick={() => setView("help")}>مساعدة ومعلومات</button>
-        <button className="ob-admin-link" onClick={() => setView("admin")}>لوحة التحكم</button>
       </div>
     </footer>
   );
@@ -1075,7 +1075,7 @@ export default function App() {
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [favorites, setFavorites] = useState([]);
 
-  const [view, setView] = useState("home");
+  const [view, setViewRaw] = useState("home");
   const [activeCategory, setActiveCategory] = useState("الكل");
   const [selectedId, setSelectedId] = useState(null);
   const [cart, setCart] = useState({});
@@ -1087,6 +1087,31 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navigate = (nextView, opts = {}) => {
+    const nextSelectedId = "selectedId" in opts ? opts.selectedId : selectedId;
+    const nextActiveCategory = "activeCategory" in opts ? opts.activeCategory : activeCategory;
+    window.history.pushState({ view: nextView, selectedId: nextSelectedId, activeCategory: nextActiveCategory }, "", nextView === "home" ? "#" : `#${nextView}`);
+    setViewRaw(nextView);
+    if ("selectedId" in opts) setSelectedId(opts.selectedId);
+    if ("activeCategory" in opts) setActiveCategory(opts.activeCategory);
+  };
+  const setView = navigate;
+
+  useEffect(() => {
+    const initialHash = window.location.hash.replace("#", "");
+    const initialView = initialHash === "admin" ? "admin" : "home";
+    window.history.replaceState({ view: initialView }, "", initialView === "home" ? "#" : `#${initialView}`);
+    setViewRaw(initialView);
+    const onPopState = (e) => {
+      const state = e.state || { view: "home" };
+      setViewRaw(state.view || "home");
+      if (state.selectedId !== undefined) setSelectedId(state.selectedId);
+      if (state.activeCategory !== undefined) setActiveCategory(state.activeCategory);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -1147,8 +1172,8 @@ export default function App() {
   const updateQty = (id, delta) => setCart((c) => ({ ...c, [id]: Math.max(0, (c[id] || 0) + delta) }));
   const removeItem = (id) => setCart((c) => ({ ...c, [id]: 0 }));
 
-  const openProduct = (id) => { setSelectedId(id); setView("product"); window.scrollTo(0, 0); };
-  const goShop = (cat) => { setActiveCategory(cat || "الكل"); setView("shop"); window.scrollTo(0, 0); };
+  const openProduct = (id) => { navigate("product", { selectedId: id }); window.scrollTo(0, 0); };
+  const goShop = (cat) => { navigate("shop", { activeCategory: cat || "الكل" }); window.scrollTo(0, 0); };
   const handleSearchSubmit = () => { if (searchQuery.trim()) { setView("search"); window.scrollTo(0, 0); } };
 
   const handleCheckoutSubmit = () => {
